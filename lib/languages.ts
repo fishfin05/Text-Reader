@@ -24,3 +24,7 @@ export function languageName(language: string): string {
 export function languageLocale(language: string): string {
   return LANGUAGE_LOCALES[language] ?? 'en-US';
 }
+
+// Average TTS narration speed at 1x, used both to estimate playback duration
+// and to size generated articles to a requested listening length.
+export const WORDS_PER_MINUTE = 150;

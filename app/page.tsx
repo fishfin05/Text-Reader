@@ -14,14 +14,10 @@ const LANGUAGES = [
 
 const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
 
-const LENGTHS = [
-  { id: 'short', label: 'Short', hint: '~400 words' },
-  { id: 'medium', label: 'Medium', hint: '~800 words' },
-  { id: 'long', label: 'Long', hint: '~1500 words' },
-] as const;
+const LENGTHS = [10, 20, 30] as const;
 
 type Mode = 'url' | 'paste' | 'generate';
-type Length = (typeof LENGTHS)[number]['id'];
+type Length = (typeof LENGTHS)[number];
 
 function readLocal(key: string, fallback: string): string {
   if (typeof window === 'undefined') return fallback;
@@ -29,17 +25,22 @@ function readLocal(key: string, fallback: string): string {
 }
 
 export default function Home() {
-  const [mode, setMode] = useState<Mode>('url');
+  const [mode, setMode] = useState<Mode>(() => (readLocal('reader-mode', 'url') as Mode));
   const [url, setUrl] = useState('');
   const [text, setText] = useState('');
   const [title, setTitle] = useState('');
   const [topic, setTopic] = useState('');
-  const [length, setLength] = useState<Length>('long');
+  const [length, setLength] = useState<Length>(30);
   const [language, setLanguage] = useState(() => readLocal('reader-language', 'en'));
   const [level, setLevel] = useState<string>(() => readLocal('reader-level', ''));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
+
+  const updateMode = (v: Mode) => {
+    setMode(v);
+    localStorage.setItem('reader-mode', v);
+  };
 
   const updateLanguage = (v: string) => {
     setLanguage(v);
@@ -130,7 +131,7 @@ export default function Home() {
           ]).map(m => (
             <button
               key={m.id}
-              onClick={() => setMode(m.id)}
+              onClick={() => updateMode(m.id)}
               className={['flex-1 py-2 text-sm font-medium rounded-lg transition-colors', mode === m.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'].join(' ')}
             >
               {m.label}
@@ -184,18 +185,17 @@ export default function Home() {
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base resize-none"
               />
               <div className="flex gap-2">
-                {LENGTHS.map(l => (
+                {LENGTHS.map(minutes => (
                   <button
-                    key={l.id}
+                    key={minutes}
                     type="button"
-                    onClick={() => setLength(l.id)}
+                    onClick={() => setLength(minutes)}
                     className={[
                       'flex-1 py-2 rounded-xl text-sm font-medium border transition-colors',
-                      length === l.id ? 'bg-blue-50 border-blue-400 text-blue-700' : 'border-gray-300 text-gray-500 hover:bg-gray-50',
+                      length === minutes ? 'bg-blue-50 border-blue-400 text-blue-700' : 'border-gray-300 text-gray-500 hover:bg-gray-50',
                     ].join(' ')}
                   >
-                    <div>{l.label}</div>
-                    <div className="text-[10px] opacity-70">{l.hint}</div>
+                    {minutes} min
                   </button>
                 ))}
               </div>

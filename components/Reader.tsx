@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import type { Article, Chunk, WordTimestamp } from '@/lib/types';
-import { languageName } from '@/lib/languages';
+import { languageName, WORDS_PER_MINUTE } from '@/lib/languages';
 
 interface VoiceOption {
   id: string;
@@ -12,7 +12,8 @@ interface VoiceOption {
 }
 
 // Average TTS words per second at 1× speed (used to estimate unloaded chunks)
-const WORDS_PER_SEC = 2.5;
+const WORDS_PER_SEC = WORDS_PER_MINUTE / 60;
+const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
 
 function formatTime(seconds: number): string {
   if (!isFinite(seconds) || seconds < 0) return '--:--';
@@ -31,7 +32,13 @@ export default function Reader({ article }: { article: Article }) {
   const [currentChunk, setCurrentChunk] = useState(0);
   const [currentWord,  setCurrentWord]  = useState(-1);
   const [isPlaying,    setIsPlaying]    = useState(false);
-  const [playbackRate, setPlaybackRate] = useState(1);
+  const [playbackRate, setPlaybackRateState] = useState(() =>
+    typeof window !== 'undefined' ? (Number(localStorage.getItem('tts-speed')) || 1) : 1
+  );
+  const setPlaybackRate = (rate: number) => {
+    setPlaybackRateState(rate);
+    localStorage.setItem('tts-speed', String(rate));
+  };
   const [ttsError,     setTtsError]     = useState('');
   const [showVoice,    setShowVoice]    = useState(false);
   const [voices, setVoices] = useState<VoiceOption[]>([]);
@@ -356,7 +363,7 @@ export default function Reader({ article }: { article: Article }) {
         <div className="px-4 py-2 flex items-center justify-between gap-2">
           {/* Speed */}
           <div className="flex gap-0.5 flex-wrap w-[72px]">
-            {[0.75, 1, 1.25, 1.5, 2].map(r => (
+            {SPEEDS.map(r => (
               <button
                 key={r}
                 onClick={() => setPlaybackRate(r)}

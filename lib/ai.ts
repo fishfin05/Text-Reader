@@ -1,16 +1,12 @@
 import { generateText, Output } from 'ai';
 import { z } from 'zod';
-import { languageName } from './languages';
+import { languageName, WORDS_PER_MINUTE } from './languages';
 
 const MODEL = 'anthropic/claude-sonnet-5';
 
-export const LENGTH_WORD_TARGETS = {
-  short: 400,
-  medium: 800,
-  long: 1500,
-} as const;
-
-export type ArticleLength = keyof typeof LENGTH_WORD_TARGETS;
+// Listening length in minutes — how long the generated article should take
+// to narrate at 1x speed, per WORDS_PER_MINUTE.
+export type ArticleLength = 10 | 20 | 30;
 
 export async function simplifyText({
   paragraphs,
@@ -54,10 +50,11 @@ export async function generateGradedText({
   topic: string;
   length: ArticleLength;
 }): Promise<{ title: string; paragraphs: string[] }> {
-  const targetWords = LENGTH_WORD_TARGETS[length];
+  const targetWords = length * WORDS_PER_MINUTE;
 
   const { output } = await generateText({
     model: MODEL,
+    maxOutputTokens: Math.min(16000, targetWords * 2 + 1000),
     output: Output.object({
       schema: z.object({
         title: z.string(),
@@ -67,7 +64,7 @@ export async function generateGradedText({
     prompt: `Write an original article in ${languageName(language)} at CEFR level ${level} about: ${topic}
 
 Rules:
-- Target length: approximately ${targetWords} words.
+- Target length: approximately ${targetWords} words (about ${length} minutes of narration).
 - Use vocabulary and grammar appropriate for CEFR ${level} — this is comprehensible input for a language learner at this level.
 - Write natural, engaging, well-organized prose in ${languageName(language)}, split into paragraphs.
 - Give it a short, fitting title (in ${languageName(language)}).

@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
     // ── generate mode ──────────────────────────────────────────────────────
     if (mode === 'generate') {
       const topic: string = (body.topic || '').trim();
-      const length: ArticleLength = body.length || 'long';
+      const length: ArticleLength = body.length || 30;
       if (!topic) return Response.json({ error: 'Topic required' }, { status: 400 });
       if (!cefrLevel) return Response.json({ error: 'CEFR level required to generate text' }, { status: 400 });
 
