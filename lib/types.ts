@@ -23,3 +23,14 @@ export interface Article {
   sourceMode: SourceMode;
   createdAt: string;
 }
+
+export interface LibraryEntry {
+  id: string;
+  title: string;
+  byline: string | null;
+  language: string;
+  cefrLevel: string | null;
+  sourceMode: SourceMode;
+  createdAt: string;
+  snippet: string | null;
+}

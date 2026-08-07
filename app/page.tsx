@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 const LANGUAGES = [
   { id: 'en', label: 'English' },
@@ -92,7 +93,8 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-md space-y-6">
-        <div className="text-center">
+        <div className="text-center relative">
+          <Link href="/library" className="absolute right-0 top-1 text-sm text-blue-600 font-medium">My Articles</Link>
           <h1 className="text-3xl font-bold text-gray-900">Text Reader</h1>
           <p className="mt-2 text-gray-500 text-sm">Comprehensible-input narration, at your level</p>
         </div>

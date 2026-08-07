@@ -41,3 +41,15 @@ export async function updateArticleChunks(id: string, chunks: Chunk[]) {
     UPDATE articles SET chunks = ${JSON.stringify(chunks)}::jsonb WHERE id = ${id}
   `;
 }
+
+export async function listArticles() {
+  const sql = getSQL();
+  return sql`
+    SELECT
+      id, title, byline, language, cefr_level, source_mode, created_at,
+      chunks->0->>'text' AS snippet
+    FROM articles
+    ORDER BY created_at DESC
+    LIMIT 200
+  `;
+}
