@@ -3,23 +3,64 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+const LANGUAGES = [
+  { id: 'en', label: 'English' },
+  { id: 'es', label: 'Spanish' },
+  { id: 'fr', label: 'French' },
+  { id: 'de', label: 'German' },
+  { id: 'it', label: 'Italian' },
+  { id: 'pt', label: 'Portuguese' },
+];
+
+const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
+
+const LENGTHS = [
+  { id: 'short', label: 'Short', hint: '~400 words' },
+  { id: 'medium', label: 'Medium', hint: '~800 words' },
+  { id: 'long', label: 'Long', hint: '~1500 words' },
+] as const;
+
+type Mode = 'url' | 'paste' | 'generate';
+type Length = (typeof LENGTHS)[number]['id'];
+
+function readLocal(key: string, fallback: string): string {
+  if (typeof window === 'undefined') return fallback;
+  return localStorage.getItem(key) || fallback;
+}
+
 export default function Home() {
-  const [mode, setMode]     = useState<'url' | 'text'>('url');
-  const [url, setUrl]       = useState('');
-  const [text, setText]     = useState('');
-  const [title, setTitle]   = useState('');
+  const [mode, setMode] = useState<Mode>('url');
+  const [url, setUrl] = useState('');
+  const [text, setText] = useState('');
+  const [title, setTitle] = useState('');
+  const [topic, setTopic] = useState('');
+  const [length, setLength] = useState<Length>('long');
+  const [language, setLanguage] = useState(() => readLocal('reader-language', 'en'));
+  const [level, setLevel] = useState<string>(() => readLocal('reader-level', ''));
   const [loading, setLoading] = useState(false);
-  const [error, setError]   = useState('');
+  const [error, setError] = useState('');
   const router = useRouter();
+
+  const updateLanguage = (v: string) => {
+    setLanguage(v);
+    localStorage.setItem('reader-language', v);
+  };
+
+  const updateLevel = (v: string) => {
+    setLevel(v);
+    localStorage.setItem('reader-level', v);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
-      const body = mode === 'url'
-        ? { url: url.trim() }
-        : { text: text.trim(), title: title.trim() || 'Untitled' };
+      const cefrLevel = level || null;
+      const body =
+        mode === 'url' ? { mode, url: url.trim(), language, cefrLevel }
+        : mode === 'paste' ? { mode, text: text.trim(), title: title.trim() || 'Untitled', language, cefrLevel }
+        : { mode, topic: topic.trim(), language, cefrLevel, length };
 
       const res = await fetch('/api/extract', {
         method: 'POST',
@@ -40,31 +81,65 @@ export default function Home() {
     }
   };
 
-  const isValid = mode === 'url' ? url.trim().length > 0 : text.trim().length > 0;
+  const isValid =
+    mode === 'url' ? url.trim().length > 0
+    : mode === 'paste' ? text.trim().length > 0
+    : topic.trim().length > 0 && level.length > 0;
+
+  const submitLabel = mode === 'generate' ? 'Generate Article' : 'Load Article';
 
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900">Text Reader</h1>
-          <p className="mt-2 text-gray-500 text-sm">Audiobook-quality narration of any article</p>
+          <p className="mt-2 text-gray-500 text-sm">Comprehensible-input narration, at your level</p>
         </div>
 
-        {/* Tab toggle */}
-        <div className="flex bg-gray-100 rounded-xl p-1">
-          {(['url', 'text'] as const).map(m => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={['flex-1 py-2 text-sm font-medium rounded-lg transition-colors', mode === m ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'].join(' ')}
+        {/* Language + Level */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Language</label>
+            <select
+              value={language}
+              onChange={e => updateLanguage(e.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
-              {m === 'url' ? 'Article URL' : 'Paste Text'}
+              {LANGUAGES.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Level</label>
+            <select
+              value={level}
+              onChange={e => updateLevel(e.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              <option value="">As-is</option>
+              {LEVELS.map(lv => <option key={lv} value={lv}>{lv}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Mode toggle */}
+        <div className="flex bg-gray-100 rounded-xl p-1">
+          {([
+            { id: 'url' as const, label: 'URL' },
+            { id: 'paste' as const, label: 'Paste' },
+            { id: 'generate' as const, label: 'Generate' },
+          ]).map(m => (
+            <button
+              key={m.id}
+              onClick={() => setMode(m.id)}
+              className={['flex-1 py-2 text-sm font-medium rounded-lg transition-colors', mode === m.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'].join(' ')}
+            >
+              {m.label}
             </button>
           ))}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          {mode === 'url' ? (
+          {mode === 'url' && (
             <input
               type="url"
               value={url}
@@ -74,7 +149,9 @@ export default function Home() {
               autoFocus
               className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
             />
-          ) : (
+          )}
+
+          {mode === 'paste' && (
             <>
               <input
                 type="text"
@@ -95,6 +172,43 @@ export default function Home() {
             </>
           )}
 
+          {mode === 'generate' && (
+            <>
+              <textarea
+                value={topic}
+                onChange={e => setTopic(e.target.value)}
+                placeholder="What should the article be about? e.g. 'a trip to a coffee shop', 'the history of the Eiffel Tower'…"
+                required
+                autoFocus
+                rows={4}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base resize-none"
+              />
+              <div className="flex gap-2">
+                {LENGTHS.map(l => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    onClick={() => setLength(l.id)}
+                    className={[
+                      'flex-1 py-2 rounded-xl text-sm font-medium border transition-colors',
+                      length === l.id ? 'bg-blue-50 border-blue-400 text-blue-700' : 'border-gray-300 text-gray-500 hover:bg-gray-50',
+                    ].join(' ')}
+                  >
+                    <div>{l.label}</div>
+                    <div className="text-[10px] opacity-70">{l.hint}</div>
+                  </button>
+                ))}
+              </div>
+              {!level && (
+                <p className="text-xs text-amber-600 text-center">Pick a level above to generate an article.</p>
+              )}
+            </>
+          )}
+
+          {mode !== 'generate' && level && (
+            <p className="text-xs text-blue-600 text-center">Will be simplified to CEFR {level}.</p>
+          )}
+
           <button
             type="submit"
             disabled={loading || !isValid}
@@ -106,9 +220,9 @@ export default function Home() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
                 </svg>
-                Loading…
+                {mode === 'generate' ? 'Generating…' : 'Loading…'}
               </>
-            ) : 'Load Article'}
+            ) : submitLabel}
           </button>
         </form>
 
@@ -117,9 +231,9 @@ export default function Home() {
         )}
 
         <p className="text-xs text-gray-400 text-center">
-          {mode === 'url'
-            ? 'Works with most news sites, blogs, and long-form articles.'
-            : 'Paste any text — articles, book chapters, documents.'}
+          {mode === 'url' && 'Works with most news sites, blogs, and long-form articles.'}
+          {mode === 'paste' && 'Paste any text — articles, book chapters, documents.'}
+          {mode === 'generate' && 'AI writes a new article at your level and topic.'}
           <br/>First listen takes a moment to generate audio per paragraph.
         </p>
       </div>

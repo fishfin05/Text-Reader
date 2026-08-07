@@ -3,3 +3,6 @@ node_modules/
 .env*.local
 drizzle/
 *.tsbuildinfo
+
+.vercel
+.env*

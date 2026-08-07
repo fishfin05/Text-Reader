@@ -14,6 +14,9 @@ export default async function ReaderPage({ params }: { params: Promise<{ id: str
     title: data.title,
     byline: data.byline,
     chunks: data.chunks,
+    language: data.language,
+    cefrLevel: data.cefr_level,
+    sourceMode: data.source_mode,
     createdAt: data.created_at,
   };
 

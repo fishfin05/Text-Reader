@@ -3,18 +3,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import type { Article, Chunk, WordTimestamp } from '@/lib/types';
+import { languageName } from '@/lib/languages';
 
-const VOICES = [
-  { id: 'en-US-Neural2-J', label: 'James',  gender: 'Male'   },
-  { id: 'en-US-Neural2-D', label: 'David',  gender: 'Male'   },
-  { id: 'en-US-Neural2-I', label: 'Ivan',   gender: 'Male'   },
-  { id: 'en-US-Neural2-A', label: 'Amy',    gender: 'Female' },
-  { id: 'en-US-Neural2-C', label: 'Clara',  gender: 'Female' },
-  { id: 'en-US-Neural2-E', label: 'Emily',  gender: 'Female' },
-  { id: 'en-US-Neural2-F', label: 'Fiona',  gender: 'Female' },
-  { id: 'en-US-Neural2-G', label: 'Grace',  gender: 'Female' },
-  { id: 'en-US-Neural2-H', label: 'Hannah', gender: 'Female' },
-];
+interface VoiceOption {
+  id: string;
+  label: string;
+  gender: 'Male' | 'Female' | 'Neutral';
+}
 
 // Average TTS words per second at 1× speed (used to estimate unloaded chunks)
 const WORDS_PER_SEC = 2.5;
@@ -39,8 +34,10 @@ export default function Reader({ article }: { article: Article }) {
   const [playbackRate, setPlaybackRate] = useState(1);
   const [ttsError,     setTtsError]     = useState('');
   const [showVoice,    setShowVoice]    = useState(false);
+  const [voices, setVoices] = useState<VoiceOption[]>([]);
+  const voiceStorageKey = `tts-voice-${article.language}`;
   const [voice, setVoice] = useState(() =>
-    typeof window !== 'undefined' ? (localStorage.getItem('tts-voice') || 'en-US-Neural2-J') : 'en-US-Neural2-J'
+    typeof window !== 'undefined' ? (localStorage.getItem(voiceStorageKey) || '') : ''
   );
   // measured durations per chunk index (in media seconds at 1×)
   const [chunkDurations, setChunkDurations] = useState<Record<number, number>>({});
@@ -58,6 +55,21 @@ export default function Reader({ article }: { article: Article }) {
 
   useEffect(() => { voiceRef.current  = voice;  }, [voice]);
   useEffect(() => { chunksRef.current = chunks; }, [chunks]);
+
+  // Load the voice catalog for this article's language, then fall back to
+  // the first available voice if nothing was saved for this language yet.
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/voices?language=${article.language}`)
+      .then(res => res.json())
+      .then((data: { voices?: VoiceOption[] }) => {
+        if (cancelled || !data.voices?.length) return;
+        setVoices(data.voices);
+        setVoice(prev => prev && data.voices!.some(v => v.id === prev) ? prev : data.voices![0].id);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [article.language]);
 
   // ── derived word counts / offsets ──────────────────────────────────────────
   const wordCounts = chunks.map(c =>
@@ -251,11 +263,11 @@ export default function Reader({ article }: { article: Article }) {
 
   const handleVoiceChange = (v: string) => {
     setVoice(v);
-    localStorage.setItem('tts-voice', v);
+    localStorage.setItem(voiceStorageKey, v);
     setShowVoice(false);
   };
 
-  const currentVoice = VOICES.find(v => v.id === voice) ?? VOICES[0];
+  const currentVoice = voices.find(v => v.id === voice) ?? voices[0];
 
   return (
     <div className="flex flex-col h-screen bg-white">
@@ -266,6 +278,11 @@ export default function Reader({ article }: { article: Article }) {
           <h1 className="font-semibold text-gray-900 text-base leading-tight truncate">{article.title}</h1>
           {article.byline && <p className="text-xs text-gray-500 truncate">{article.byline}</p>}
         </div>
+        {(article.cefrLevel || article.language !== 'en') && (
+          <span className="shrink-0 text-[11px] font-medium text-blue-700 bg-blue-50 px-2 py-1 rounded-full whitespace-nowrap">
+            {article.cefrLevel ? `${article.cefrLevel} · ` : ''}{languageName(article.language)}
+          </span>
+        )}
       </div>
 
       {/* Article text */}
@@ -391,9 +408,13 @@ export default function Reader({ article }: { article: Article }) {
           </div>
 
           {/* Voice */}
-          <button onClick={() => setShowVoice(true)} className="text-right w-[72px] hover:opacity-70 transition-opacity">
-            <div className="text-xs font-medium text-gray-700">{currentVoice.label}</div>
-            <div className="text-[10px] text-gray-400">{currentVoice.gender}</div>
+          <button
+            onClick={() => setShowVoice(true)}
+            disabled={!currentVoice}
+            className="text-right w-[72px] hover:opacity-70 transition-opacity disabled:opacity-40"
+          >
+            <div className="text-xs font-medium text-gray-700">{currentVoice?.label ?? '…'}</div>
+            <div className="text-[10px] text-gray-400">{currentVoice?.gender ?? ''}</div>
           </button>
         </div>
       </div>
@@ -408,7 +429,7 @@ export default function Reader({ article }: { article: Article }) {
             <h2 className="font-semibold text-gray-900 mb-1">Voice</h2>
             <p className="text-xs text-gray-400 mb-4">Applies to newly generated chunks. Already-played audio keeps its original voice.</p>
             <div className="space-y-1">
-              {VOICES.map(v => (
+              {voices.map(v => (
                 <button
                   key={v.id}
                   onClick={() => handleVoiceChange(v.id)}

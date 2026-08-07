@@ -1,5 +1,5 @@
 import { neon } from '@neondatabase/serverless';
-import type { Chunk } from './types';
+import type { Chunk, SourceMode } from './types';
 
 function getSQL() {
   return neon(process.env.DATABASE_URL!);
@@ -21,12 +21,15 @@ export async function createArticle(
   url: string,
   title: string,
   byline: string | null,
-  chunks: Chunk[]
+  chunks: Chunk[],
+  language: string,
+  cefrLevel: string | null,
+  sourceMode: SourceMode
 ) {
   const sql = getSQL();
   const rows = await sql`
-    INSERT INTO articles (url, title, byline, chunks)
-    VALUES (${url}, ${title}, ${byline}, ${JSON.stringify(chunks)}::jsonb)
+    INSERT INTO articles (url, title, byline, chunks, language, cefr_level, source_mode)
+    VALUES (${url}, ${title}, ${byline}, ${JSON.stringify(chunks)}::jsonb, ${language}, ${cefrLevel}, ${sourceMode})
     RETURNING *
   `;
   return rows[0];

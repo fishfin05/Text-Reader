@@ -10,11 +10,16 @@ export interface Chunk {
   audioUrl: string | null;
 }
 
+export type SourceMode = 'url' | 'paste' | 'generate';
+
 export interface Article {
   id: string;
   url: string;
   title: string;
   byline: string | null;
   chunks: Chunk[];
+  language: string;
+  cefrLevel: string | null;
+  sourceMode: SourceMode;
   createdAt: string;
 }

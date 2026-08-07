@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { put } from '@vercel/blob';
 import { getArticleById, updateArticleChunks } from '@/lib/db';
+import { languageLocale } from '@/lib/languages';
 import type { Chunk, WordTimestamp } from '@/lib/types';
 
 const TTS_API_KEY = process.env.GOOGLE_TTS_API_KEY!;
@@ -40,6 +41,7 @@ export async function POST(request: NextRequest) {
 
     const words = chunk.text.split(/\s+/).filter(Boolean);
     const ssml = buildSSML(words);
+    const languageCode = languageLocale(article.language);
 
     const ttsRes = await fetch(
       `https://texttospeech.googleapis.com/v1beta1/text:synthesize?key=${TTS_API_KEY}`,
@@ -48,7 +50,7 @@ export async function POST(request: NextRequest) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           input: { ssml },
-          voice: { languageCode: 'en-US', name: (voice as string) || TTS_VOICE },
+          voice: { languageCode, name: (voice as string) || (languageCode === 'en-US' ? TTS_VOICE : undefined) },
           audioConfig: { audioEncoding: 'MP3', speakingRate: 1.0 },
           enableTimePointing: ['SSML_MARK'],
         }),
