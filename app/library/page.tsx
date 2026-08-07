@@ -1,9 +1,9 @@
-import { listArticles } from '@/lib/db';
+import { listArticles, getListeningTotals } from '@/lib/db';
 import Library from '@/components/Library';
 import type { LibraryEntry } from '@/lib/types';
 
 export default async function LibraryPage() {
-  const rows = await listArticles();
+  const [rows, totalsRows] = await Promise.all([listArticles(), getListeningTotals()]);
 
   const entries: LibraryEntry[] = rows.map(r => ({
     id: r.id,
@@ -16,5 +16,7 @@ export default async function LibraryPage() {
     snippet: r.snippet,
   }));
 
-  return <Library entries={entries} />;
+  const listeningTotals = totalsRows.map(r => ({ language: r.language as string, seconds: r.seconds as number }));
+
+  return <Library entries={entries} listeningTotals={listeningTotals} />;
 }

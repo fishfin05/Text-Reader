@@ -53,3 +53,42 @@ export async function listArticles() {
     LIMIT 200
   `;
 }
+
+export async function logListeningSession(
+  language: string,
+  articleId: string | null,
+  startedAt: string,
+  seconds: number
+) {
+  const sql = getSQL();
+  await sql`
+    INSERT INTO listening_sessions (language, article_id, started_at, seconds)
+    VALUES (${language}, ${articleId}, ${startedAt}, ${seconds})
+  `;
+}
+
+export async function getListeningTotals() {
+  const sql = getSQL();
+  return sql`
+    SELECT language, SUM(seconds)::int AS seconds
+    FROM listening_sessions
+    GROUP BY language
+    ORDER BY seconds DESC
+  `;
+}
+
+export interface ListeningSessionRow {
+  language: string;
+  article_id: string | null;
+  started_at: string;
+  seconds: number;
+}
+
+export async function getListeningSessions(): Promise<ListeningSessionRow[]> {
+  const sql = getSQL();
+  return sql`
+    SELECT language, article_id, started_at, seconds
+    FROM listening_sessions
+    ORDER BY started_at DESC
+  ` as unknown as Promise<ListeningSessionRow[]>;
+}

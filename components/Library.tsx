@@ -11,6 +11,13 @@ const SOURCE_LABELS: Record<string, string> = {
   generate: 'Generated',
 };
 
+function formatDuration(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.round((totalSeconds % 3600) / 60);
+  if (h === 0) return `${m}m`;
+  return `${h}h ${m}m`;
+}
+
 function formatRelativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const minutes = Math.floor(diffMs / 60000);
@@ -23,7 +30,13 @@ function formatRelativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-export default function Library({ entries }: { entries: LibraryEntry[] }) {
+export default function Library({
+  entries,
+  listeningTotals,
+}: {
+  entries: LibraryEntry[];
+  listeningTotals: { language: string; seconds: number }[];
+}) {
   const [language, setLanguage] = useState('');
   const [level, setLevel] = useState('');
 
@@ -73,6 +86,28 @@ export default function Library({ entries }: { entries: LibraryEntry[] }) {
           </div>
         )}
       </div>
+
+      {listeningTotals.length > 0 && (
+        <div className="max-w-2xl mx-auto px-4 pt-4">
+          <div className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+              {listeningTotals.map(t => (
+                <span key={t.language} className="text-gray-700">
+                  <span className="font-medium">{languageName(t.language)}</span>
+                  <span className="text-gray-400"> · {formatDuration(t.seconds)}</span>
+                </span>
+              ))}
+            </div>
+            <a
+              href="/api/listening?format=csv"
+              download
+              className="text-xs text-blue-600 font-medium whitespace-nowrap shrink-0"
+            >
+              Export CSV
+            </a>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-2xl mx-auto px-4 py-4 space-y-2">
         {filtered.length === 0 && (

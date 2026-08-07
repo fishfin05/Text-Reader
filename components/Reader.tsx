@@ -78,6 +78,55 @@ export default function Reader({ article }: { article: Article }) {
     return () => { cancelled = true; };
   }, [article.language]);
 
+  // ── listening time tracking ────────────────────────────────────────────────
+  // One "session" spans continuous playback (chunk auto-advance doesn't reset
+  // it), from a real play to a real pause/stop. Flushed to the server on
+  // pause, and checkpointed (flushed but kept running) on page hide/unmount
+  // so backgrounded/closed-tab listening isn't lost or undercounted.
+  const listeningSessionStart = useRef<number | null>(null);
+  const isPlayingRef = useRef(false);
+  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+
+  const flushListeningSession = useCallback((beacon: boolean, keepGoing: boolean) => {
+    const start = listeningSessionStart.current;
+    if (start) {
+      const seconds = Math.round((Date.now() - start) / 1000);
+      if (seconds >= 3) {
+        const payload = JSON.stringify({
+          language: article.language,
+          articleId: article.id,
+          startedAt: new Date(start).toISOString(),
+          seconds,
+        });
+        if (beacon && navigator.sendBeacon) {
+          navigator.sendBeacon('/api/listening', new Blob([payload], { type: 'application/json' }));
+        } else {
+          fetch('/api/listening', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).catch(() => {});
+        }
+      }
+    }
+    listeningSessionStart.current = keepGoing ? Date.now() : null;
+  }, [article.language, article.id]);
+
+  useEffect(() => {
+    if (isPlaying) {
+      if (!listeningSessionStart.current) listeningSessionStart.current = Date.now();
+    } else {
+      flushListeningSession(false, false);
+    }
+  }, [isPlaying, flushListeningSession]);
+
+  useEffect(() => {
+    const onPageHide = () => flushListeningSession(true, isPlayingRef.current);
+    window.addEventListener('pagehide', onPageHide);
+    window.addEventListener('beforeunload', onPageHide);
+    return () => {
+      window.removeEventListener('pagehide', onPageHide);
+      window.removeEventListener('beforeunload', onPageHide);
+      flushListeningSession(true, false); // component unmount (client-side nav away)
+    };
+  }, [flushListeningSession]);
+
   // ── derived word counts / offsets ──────────────────────────────────────────
   const wordCounts = chunks.map(c =>
     c.wordTimestamps.length > 0
