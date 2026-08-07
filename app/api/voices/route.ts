@@ -35,16 +35,21 @@ function pickTier(voices: GoogleVoice[]): GoogleVoice[] {
 function buildVoiceOptions(voices: GoogleVoice[]): VoiceOption[] {
   const tiered = pickTier(voices).sort((a, b) => a.name.localeCompare(b.name));
   let maleI = 0, femaleI = 0, neutralI = 0;
+  const options: VoiceOption[] = [];
 
-  return tiered.map(v => {
-    if (v.ssmlGender === 'MALE') {
-      return { id: v.name, label: MALE_NAMES[maleI++ % MALE_NAMES.length], gender: 'Male' as const };
+  // Cap at one voice per display name — large tiers (e.g. 30 Chirp3-HD
+  // voices) would otherwise repeat names and look like duplicates in the UI.
+  for (const v of tiered) {
+    if (v.ssmlGender === 'MALE' && maleI < MALE_NAMES.length) {
+      options.push({ id: v.name, label: MALE_NAMES[maleI++], gender: 'Male' });
+    } else if (v.ssmlGender === 'FEMALE' && femaleI < FEMALE_NAMES.length) {
+      options.push({ id: v.name, label: FEMALE_NAMES[femaleI++], gender: 'Female' });
+    } else if (v.ssmlGender !== 'MALE' && v.ssmlGender !== 'FEMALE' && neutralI < NEUTRAL_NAMES.length) {
+      options.push({ id: v.name, label: NEUTRAL_NAMES[neutralI++], gender: 'Neutral' });
     }
-    if (v.ssmlGender === 'FEMALE') {
-      return { id: v.name, label: FEMALE_NAMES[femaleI++ % FEMALE_NAMES.length], gender: 'Female' as const };
-    }
-    return { id: v.name, label: NEUTRAL_NAMES[neutralI++ % NEUTRAL_NAMES.length], gender: 'Neutral' as const };
-  });
+  }
+
+  return options;
 }
 
 export async function GET(request: NextRequest) {

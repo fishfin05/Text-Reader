@@ -64,7 +64,8 @@ export async function generateGradedText({
     prompt: `Write an original article in ${languageName(language)} at CEFR level ${level} about: ${topic}
 
 Rules:
-- Target length: approximately ${targetWords} words (about ${length} minutes of narration).
+- REQUIRED LENGTH: at least ${targetWords} words. This is a hard minimum, not a suggestion — this article is meant to be listened to for about ${length} minutes, so stopping early defeats the point. If ${targetWords} words feels like more than the topic "needs," widen the scope: cover the topic from multiple angles, add relevant background, examples, sub-stories, or related tangents, the way a real long-form article or podcast episode would. Do not pad with repetition — add genuinely new content instead.
+- Before finalizing, mentally check your draft's length against the ${targetWords}-word minimum. If it's short, keep writing additional sections rather than concluding.
 - Use vocabulary and grammar appropriate for CEFR ${level} — this is comprehensible input for a language learner at this level.
 - Write natural, engaging, well-organized prose in ${languageName(language)}, split into paragraphs.
 - Give it a short, fitting title (in ${languageName(language)}).
