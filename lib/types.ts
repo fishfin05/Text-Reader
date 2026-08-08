@@ -8,6 +8,7 @@ export interface Chunk {
   text: string;
   wordTimestamps: WordTimestamp[];
   audioUrl: string | null;
+  voice: string | null;
 }
 
 export type SourceMode = 'url' | 'paste' | 'generate';
@@ -33,4 +34,5 @@ export interface LibraryEntry {
   sourceMode: SourceMode;
   createdAt: string;
   snippet: string | null;
+  wordCount: number;
 }

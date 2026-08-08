@@ -1,9 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { LibraryEntry } from '@/lib/types';
-import { languageName } from '@/lib/languages';
+import { languageName, WORDS_PER_MINUTE } from '@/lib/languages';
 
 const SOURCE_LABELS: Record<string, string> = {
   url: 'URL',
@@ -30,15 +30,46 @@ function formatRelativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+interface ListeningSession {
+  language: string;
+  startedAt: string;
+  seconds: number;
+}
+
+interface LanguageStats {
+  language: string;
+  today: number;
+  week: number;
+  total: number;
+}
+
+function computeStats(sessions: ListeningSession[]): LanguageStats[] {
+  const now = Date.now();
+  const startOfToday = new Date().setHours(0, 0, 0, 0);
+  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+
+  const byLanguage = new Map<string, LanguageStats>();
+  for (const s of sessions) {
+    const stats = byLanguage.get(s.language) ?? { language: s.language, today: 0, week: 0, total: 0 };
+    const startedAt = new Date(s.startedAt).getTime();
+    stats.total += s.seconds;
+    if (startedAt >= sevenDaysAgo) stats.week += s.seconds;
+    if (startedAt >= startOfToday) stats.today += s.seconds;
+    byLanguage.set(s.language, stats);
+  }
+  return Array.from(byLanguage.values()).sort((a, b) => b.total - a.total);
+}
+
 export default function Library({
   entries,
-  listeningTotals,
+  listeningSessions,
 }: {
   entries: LibraryEntry[];
-  listeningTotals: { language: string; seconds: number }[];
+  listeningSessions: ListeningSession[];
 }) {
   const [language, setLanguage] = useState('');
   const [level, setLevel] = useState('');
+  const listeningStats = useMemo(() => computeStats(listeningSessions), [listeningSessions]);
 
   const languages = useMemo(
     () => Array.from(new Set(entries.map(e => e.language))).sort(),
@@ -87,24 +118,29 @@ export default function Library({
         )}
       </div>
 
-      {listeningTotals.length > 0 && (
+      {listeningStats.length > 0 && (
         <div className="max-w-2xl mx-auto px-4 pt-4">
-          <div className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between gap-3">
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-              {listeningTotals.map(t => (
-                <span key={t.language} className="text-gray-700">
-                  <span className="font-medium">{languageName(t.language)}</span>
-                  <span className="text-gray-400"> · {formatDuration(t.seconds)}</span>
-                </span>
+          <div className="bg-white rounded-xl border border-gray-200 px-4 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-gray-400">Time practiced</span>
+              <a href="/api/listening?format=csv" download className="text-xs text-blue-600 font-medium">
+                Export CSV
+              </a>
+            </div>
+            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-1 text-sm items-center">
+              <span className="text-[11px] font-medium text-gray-400"></span>
+              <span className="text-[11px] font-medium text-gray-400 text-right">Today</span>
+              <span className="text-[11px] font-medium text-gray-400 text-right">Week</span>
+              <span className="text-[11px] font-medium text-gray-400 text-right">Total</span>
+              {listeningStats.map(s => (
+                <Fragment key={s.language}>
+                  <span className="text-gray-700 font-medium">{languageName(s.language)}</span>
+                  <span className="text-gray-600 text-right">{formatDuration(s.today)}</span>
+                  <span className="text-gray-600 text-right">{formatDuration(s.week)}</span>
+                  <span className="text-gray-600 text-right">{formatDuration(s.total)}</span>
+                </Fragment>
               ))}
             </div>
-            <a
-              href="/api/listening?format=csv"
-              download
-              className="text-xs text-blue-600 font-medium whitespace-nowrap shrink-0"
-            >
-              Export CSV
-            </a>
           </div>
         </div>
       )}
@@ -139,6 +175,9 @@ export default function Library({
               </span>
               <span className="text-[11px] font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
                 {SOURCE_LABELS[e.sourceMode] ?? e.sourceMode}
+              </span>
+              <span className="text-[11px] text-gray-400">
+                {formatDuration(Math.round((e.wordCount / WORDS_PER_MINUTE) * 60))} at 1x
               </span>
             </div>
           </Link>

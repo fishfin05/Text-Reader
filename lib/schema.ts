@@ -10,6 +10,7 @@ export const articles = pgTable('articles', {
   language:   text('language').notNull().default('en'),
   cefrLevel:  text('cefr_level'),
   sourceMode: text('source_mode').notNull().default('url'),
+  wordCount:  integer('word_count').notNull().default(0),
   createdAt:  timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

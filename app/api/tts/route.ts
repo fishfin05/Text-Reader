@@ -34,8 +34,10 @@ export async function POST(request: NextRequest) {
     const chunk = chunks[chunkIndex];
     if (!chunk) return Response.json({ error: 'Chunk not found' }, { status: 404 });
 
-    // Return cached audio if already generated
-    if (chunk.audioUrl) {
+    // Return cached audio only if it was generated with the same voice —
+    // otherwise a voice change would silently keep playing the old voice
+    // for any chunk that happened to already be cached.
+    if (chunk.audioUrl && chunk.voice === (voice || null)) {
       return Response.json({ audioUrl: chunk.audioUrl, wordTimestamps: chunk.wordTimestamps });
     }
 
@@ -74,7 +76,7 @@ export async function POST(request: NextRequest) {
       contentType: 'audio/mpeg',
     });
 
-    chunks[chunkIndex] = { ...chunk, wordTimestamps, audioUrl: blob.url };
+    chunks[chunkIndex] = { ...chunk, wordTimestamps, audioUrl: blob.url, voice: voice || null };
     await updateArticleChunks(articleId, chunks);
 
     return Response.json({ audioUrl: blob.url, wordTimestamps });

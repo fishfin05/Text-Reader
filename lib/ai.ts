@@ -39,6 +39,13 @@ ${paragraphs.join('\n\n')}`,
   return output.paragraphs;
 }
 
+function countWords(paragraphs: string[]): number {
+  return paragraphs.reduce((sum, p) => sum + p.split(/\s+/).filter(Boolean).length, 0);
+}
+
+const UNDERSHOOT_TOLERANCE = 0.85; // accept within 15% of target without extending
+const MAX_EXTEND_ROUNDS = 2;
+
 export async function generateGradedText({
   language,
   level,
@@ -49,7 +56,7 @@ export async function generateGradedText({
   level: string;
   topic: string;
   length: ArticleLength;
-}): Promise<{ title: string; paragraphs: string[] }> {
+}): Promise<{ title: string; paragraphs: string[]; actualWords: number }> {
   const targetWords = length * WORDS_PER_MINUTE;
 
   const { output } = await generateText({
@@ -72,5 +79,32 @@ Rules:
 - Do not add commentary or notes — only the title and article text.`,
   });
 
-  return output;
+  const title = output.title;
+  let paragraphs = output.paragraphs;
+  let wordCount = countWords(paragraphs);
+
+  // Single-pass generation reliably undershoots explicit word targets — a
+  // prompt asking for "at least N words" is a request, not a guarantee. If
+  // we're meaningfully short, ask the model to keep going and append,
+  // rather than silently handing back something shorter than requested.
+  for (let round = 0; round < MAX_EXTEND_ROUNDS && wordCount < targetWords * UNDERSHOOT_TOLERANCE; round++) {
+    const remaining = targetWords - wordCount;
+    const { output: more } = await generateText({
+      model: MODEL,
+      maxOutputTokens: Math.min(16000, remaining * 2 + 1000),
+      output: Output.object({
+        schema: z.object({ paragraphs: z.array(z.string()) }),
+      }),
+      prompt: `You are continuing an in-progress article titled "${title}", written in ${languageName(language)} at CEFR level ${level}, about: ${topic}
+
+Here is the article so far:
+${paragraphs.join('\n\n')}
+
+Write approximately ${remaining} MORE words continuing this article — new sections, angles, examples, or sub-topics, not a summary or repetition of what's already there. Match the same CEFR ${level} vocabulary/grammar level, tone, and language. Output only the new paragraphs to append — do not repeat the existing text, and do not add commentary.`,
+    });
+    paragraphs = [...paragraphs, ...more.paragraphs];
+    wordCount = countWords(paragraphs);
+  }
+
+  return { title, paragraphs, actualWords: wordCount };
 }

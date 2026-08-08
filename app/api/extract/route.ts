@@ -3,6 +3,7 @@ import { parseHTML } from 'linkedom';
 import { Readability } from '@mozilla/readability';
 import { getArticleByUrl, createArticle } from '@/lib/db';
 import { simplifyText, generateGradedText, type ArticleLength } from '@/lib/ai';
+import { WORDS_PER_MINUTE } from '@/lib/languages';
 import type { Chunk, SourceMode } from '@/lib/types';
 
 function splitIntoChunks(paragraphs: string[]): Chunk[] {
@@ -36,6 +37,7 @@ function makeChunk(index: number, text: string): Chunk {
     text,
     wordTimestamps: text.split(/\s+/).filter(Boolean).map(w => ({ word: w, startTime: 0 })),
     audioUrl: null,
+    voice: null,
   };
 }
 
@@ -87,7 +89,8 @@ export async function POST(request: NextRequest) {
       if (!topic) return Response.json({ error: 'Topic required' }, { status: 400 });
       if (!cefrLevel) return Response.json({ error: 'CEFR level required to generate text' }, { status: 400 });
 
-      const { title, paragraphs } = await generateGradedText({ language, level: cefrLevel, topic, length });
+      const { title, paragraphs, actualWords } = await generateGradedText({ language, level: cefrLevel, topic, length });
+      console.log(`Generated "${title}": ${actualWords} words (target ${length * WORDS_PER_MINUTE}) for a ${length}min request`);
       const chunks = splitIntoChunks(paragraphs);
       const data = await createArticle(syntheticUrl('gen'), title, null, chunks, language, cefrLevel, mode);
       return Response.json({ id: data.id, url: data.url, title: data.title, byline: null, chunks: data.chunks, createdAt: data.created_at });

@@ -27,9 +27,10 @@ export async function createArticle(
   sourceMode: SourceMode
 ) {
   const sql = getSQL();
+  const wordCount = chunks.reduce((sum, c) => sum + c.text.split(/\s+/).filter(Boolean).length, 0);
   const rows = await sql`
-    INSERT INTO articles (url, title, byline, chunks, language, cefr_level, source_mode)
-    VALUES (${url}, ${title}, ${byline}, ${JSON.stringify(chunks)}::jsonb, ${language}, ${cefrLevel}, ${sourceMode})
+    INSERT INTO articles (url, title, byline, chunks, language, cefr_level, source_mode, word_count)
+    VALUES (${url}, ${title}, ${byline}, ${JSON.stringify(chunks)}::jsonb, ${language}, ${cefrLevel}, ${sourceMode}, ${wordCount})
     RETURNING *
   `;
   return rows[0];
@@ -46,7 +47,7 @@ export async function listArticles() {
   const sql = getSQL();
   return sql`
     SELECT
-      id, title, byline, language, cefr_level, source_mode, created_at,
+      id, title, byline, language, cefr_level, source_mode, created_at, word_count,
       chunks->0->>'text' AS snippet
     FROM articles
     ORDER BY created_at DESC

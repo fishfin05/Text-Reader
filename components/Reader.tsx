@@ -195,9 +195,14 @@ export default function Reader({ article }: { article: Article }) {
   }, [article.id]); // no chunks/voice deps — uses refs instead
 
   // ── playback ───────────────────────────────────────────────────────────────
+  // A chunk needs (re)generating if it has no audio yet, or its cached audio
+  // was made with a different voice than the one currently selected.
+  const needsGeneration = (chunk: Chunk | undefined) =>
+    !chunk?.audioUrl || chunk.voice !== voiceRef.current;
+
   const play = useCallback(async (chunkIndex: number, seekTime?: number) => {
     let chunk = chunksRef.current[chunkIndex];
-    if (!chunk?.audioUrl) {
+    if (needsGeneration(chunk)) {
       const gen = await generateChunk(chunkIndex);
       if (!gen) return;
       chunk = gen;
@@ -219,7 +224,7 @@ export default function Reader({ article }: { article: Article }) {
     // preload next
     const next = chunkIndex + 1;
     const nextChunk = chunksRef.current[next];
-    if (nextChunk && !nextChunk.audioUrl && chunkStates[next] === 'idle') {
+    if (nextChunk && needsGeneration(nextChunk) && chunkStates[next] === 'idle') {
       generateChunk(next);
     }
   }, [chunkStates, playbackRate, generateChunk]);
@@ -321,6 +326,13 @@ export default function Reader({ article }: { article: Article }) {
     setVoice(v);
     localStorage.setItem(voiceStorageKey, v);
     setShowVoice(false);
+
+    // Mark upcoming chunks as needing regeneration in the new voice. If
+    // something's actively playing, leave the current chunk alone so audio
+    // doesn't cut out mid-sentence — it'll pick up the new voice once it
+    // finishes. If paused, the current chunk is fair game too.
+    const from = isPlaying ? currentChunkRef.current + 1 : currentChunkRef.current;
+    setChunkStates(prev => prev.map((s, i) => (i >= from && chunksRef.current[i]?.voice !== v ? 'idle' : s)));
   };
 
   const currentVoice = voices.find(v => v.id === voice) ?? voices[0];
