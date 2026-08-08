@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -20,23 +20,31 @@ const LENGTHS = [10, 20, 30] as const;
 type Mode = 'url' | 'paste' | 'generate';
 type Length = (typeof LENGTHS)[number];
 
-function readLocal(key: string, fallback: string): string {
-  if (typeof window === 'undefined') return fallback;
-  return localStorage.getItem(key) || fallback;
-}
-
 export default function Home() {
-  const [mode, setMode] = useState<Mode>(() => (readLocal('reader-mode', 'url') as Mode));
+  // Server and client must render the same thing on first paint (no
+  // localStorage server-side), or React throws a hydration mismatch — so
+  // these all start with a fixed default and get synced from localStorage
+  // in an effect, which only ever runs client-side, after hydration.
+  const [mode, setMode] = useState<Mode>('url');
   const [url, setUrl] = useState('');
   const [text, setText] = useState('');
   const [title, setTitle] = useState('');
   const [topic, setTopic] = useState('');
   const [length, setLength] = useState<Length>(30);
-  const [language, setLanguage] = useState(() => readLocal('reader-language', 'en'));
-  const [level, setLevel] = useState<string>(() => readLocal('reader-level', ''));
+  const [language, setLanguage] = useState('en');
+  const [level, setLevel] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
+
+  useEffect(() => {
+    // One-time hydration-safe sync from localStorage — not derived state,
+    // just reading an external browser API that isn't available server-side.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMode((localStorage.getItem('reader-mode') as Mode) || 'url');
+    setLanguage(localStorage.getItem('reader-language') || 'en');
+    setLevel(localStorage.getItem('reader-level') || '');
+  }, []);
 
   const updateMode = (v: Mode) => {
     setMode(v);

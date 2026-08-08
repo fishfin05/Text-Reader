@@ -32,9 +32,10 @@ export default function Reader({ article }: { article: Article }) {
   const [currentChunk, setCurrentChunk] = useState(0);
   const [currentWord,  setCurrentWord]  = useState(-1);
   const [isPlaying,    setIsPlaying]    = useState(false);
-  const [playbackRate, setPlaybackRateState] = useState(() =>
-    typeof window !== 'undefined' ? (Number(localStorage.getItem('tts-speed')) || 1) : 1
-  );
+  // Server and client must render the same thing on first paint (no
+  // localStorage server-side), so these start with a fixed default and get
+  // synced from localStorage client-side only, in an effect below.
+  const [playbackRate, setPlaybackRateState] = useState(1);
   const setPlaybackRate = (rate: number) => {
     setPlaybackRateState(rate);
     localStorage.setItem('tts-speed', String(rate));
@@ -43,9 +44,14 @@ export default function Reader({ article }: { article: Article }) {
   const [showVoice,    setShowVoice]    = useState(false);
   const [voices, setVoices] = useState<VoiceOption[]>([]);
   const voiceStorageKey = `tts-voice-${article.language}`;
-  const [voice, setVoice] = useState(() =>
-    typeof window !== 'undefined' ? (localStorage.getItem(voiceStorageKey) || '') : ''
-  );
+  const [voice, setVoice] = useState('');
+
+  useEffect(() => {
+    // One-time hydration-safe sync from localStorage — not derived state,
+    // just reading an external browser API that isn't available server-side.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPlaybackRateState(Number(localStorage.getItem('tts-speed')) || 1);
+  }, []);
   // measured durations per chunk index (in media seconds at 1×)
   const [chunkDurations, setChunkDurations] = useState<Record<number, number>>({});
   const [audioTime, setAudioTime] = useState(0);
@@ -72,11 +78,12 @@ export default function Reader({ article }: { article: Article }) {
       .then((data: { voices?: VoiceOption[] }) => {
         if (cancelled || !data.voices?.length) return;
         setVoices(data.voices);
-        setVoice(prev => prev && data.voices!.some(v => v.id === prev) ? prev : data.voices![0].id);
+        const saved = localStorage.getItem(voiceStorageKey);
+        setVoice(saved && data.voices!.some(v => v.id === saved) ? saved : data.voices![0].id);
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [article.language]);
+  }, [article.language, voiceStorageKey]);
 
   // ── listening time tracking ────────────────────────────────────────────────
   // One "session" spans continuous playback (chunk auto-advance doesn't reset
