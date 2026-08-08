@@ -81,8 +81,10 @@ function syntheticUrl(prefix: string): string {
 }
 
 export async function POST(request: NextRequest) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let body: any;
   try {
-    const body = await request.json();
+    body = await request.json();
     const mode: SourceMode = body.mode ?? (body.text ? 'paste' : 'url');
     const language: string = body.language || 'en';
     const cefrLevel: string | null = body.cefrLevel || null;
@@ -160,7 +162,10 @@ export async function POST(request: NextRequest) {
       createdAt: data.created_at,
     });
   } catch (err) {
-    console.error('Extract error:', err);
+    console.error('Extract error:', err, '| request:', JSON.stringify({
+      mode: body?.mode, language: body?.language, cefrLevel: body?.cefrLevel,
+      length: body?.length, topic: body?.topic, url: body?.url,
+    }));
     return Response.json(
       { error: err instanceof Error ? err.message : 'Failed to extract article' },
       { status: 500 }

@@ -11,6 +11,22 @@ export type ArticleLength = 10 | 20 | 30;
 // generateText occasionally throws AI_NoOutputGeneratedError on a transient
 // hiccup (provider blip, structured-output parse miss) — a bare retry
 // resolves most of these rather than failing the whole request outright.
+function describeError(err: unknown): Record<string, unknown> {
+  if (!(err instanceof Error)) return { value: err };
+  const e = err as Error & { text?: string; cause?: unknown; finishReason?: string; usage?: unknown };
+  return {
+    name: e.name,
+    message: e.message,
+    cause: e.cause ? String(e.cause) : undefined,
+    finishReason: e.finishReason,
+    usage: e.usage,
+    // The raw text the model returned, if any — the most useful field for
+    // telling apart "model refused/returned prose instead of JSON" from
+    // "truly empty response" from "malformed JSON."
+    text: e.text?.slice(0, 1000),
+  };
+}
+
 async function withRetry<T>(fn: () => Promise<T>, attempts = 2): Promise<T> {
   let lastErr: unknown;
   for (let i = 0; i < attempts; i++) {
@@ -18,7 +34,7 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 2): Promise<T> {
       return await fn();
     } catch (err) {
       lastErr = err;
-      console.error(`Generation attempt ${i + 1}/${attempts} failed:`, err);
+      console.error(`Generation attempt ${i + 1}/${attempts} failed:`, JSON.stringify(describeError(err)));
       if (i < attempts - 1) await new Promise(r => setTimeout(r, 1000 * (i + 1)));
     }
   }
