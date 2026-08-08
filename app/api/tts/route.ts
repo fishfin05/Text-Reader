@@ -70,10 +70,13 @@ export async function POST(request: NextRequest) {
       startTime: timepoints.find(t => t.markName === `w${i}`)?.timeSeconds ?? 0,
     }));
 
-    // Upload to Vercel Blob
+    // Upload to Vercel Blob. Regenerating a chunk (e.g. after a voice
+    // change) reuses the same path, so this needs a random suffix rather
+    // than overwriting — put() throws on a path collision by default.
     const blob = await put(`${articleId}/${chunkIndex}.mp3`, audioBytes, {
       access: 'public',
       contentType: 'audio/mpeg',
+      addRandomSuffix: true,
     });
 
     chunks[chunkIndex] = { ...chunk, wordTimestamps, audioUrl: blob.url, voice: voice || null };
