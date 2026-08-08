@@ -6,6 +6,11 @@ import { simplifyText, generateGradedText, type ArticleLength } from '@/lib/ai';
 import { WORDS_PER_MINUTE } from '@/lib/languages';
 import type { Chunk, SourceMode } from '@/lib/types';
 
+// Generate mode can chain up to 3 sequential AI calls (initial + 2 extend
+// rounds) — give it plenty of room rather than risk a platform timeout
+// killing a request mid-generation.
+export const maxDuration = 180;
+
 function splitIntoChunks(paragraphs: string[]): Chunk[] {
   const chunks: Chunk[] = [];
   let index = 0;

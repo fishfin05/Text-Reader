@@ -8,6 +8,23 @@ const MODEL = 'anthropic/claude-sonnet-5';
 // to narrate at 1x speed, per WORDS_PER_MINUTE.
 export type ArticleLength = 10 | 20 | 30;
 
+// generateText occasionally throws AI_NoOutputGeneratedError on a transient
+// hiccup (provider blip, structured-output parse miss) — a bare retry
+// resolves most of these rather than failing the whole request outright.
+async function withRetry<T>(fn: () => Promise<T>, attempts = 2): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      console.error(`Generation attempt ${i + 1}/${attempts} failed:`, err);
+      if (i < attempts - 1) await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+    }
+  }
+  throw lastErr;
+}
+
 export async function simplifyText({
   paragraphs,
   language,
@@ -17,7 +34,7 @@ export async function simplifyText({
   language: string;
   level: string;
 }): Promise<string[]> {
-  const { output } = await generateText({
+  const { output } = await withRetry(() => generateText({
     model: MODEL,
     output: Output.object({
       schema: z.object({
@@ -34,7 +51,7 @@ Rules:
 
 Original text (one paragraph per line):
 ${paragraphs.join('\n\n')}`,
-  });
+  }));
 
   return output.paragraphs;
 }
@@ -59,7 +76,7 @@ export async function generateGradedText({
 }): Promise<{ title: string; paragraphs: string[]; actualWords: number }> {
   const targetWords = length * WORDS_PER_MINUTE;
 
-  const { output } = await generateText({
+  const { output } = await withRetry(() => generateText({
     model: MODEL,
     maxOutputTokens: Math.min(16000, targetWords * 2 + 1000),
     output: Output.object({
@@ -77,7 +94,7 @@ Rules:
 - Write natural, engaging, well-organized prose in ${languageName(language)}, split into paragraphs.
 - Give it a short, fitting title (in ${languageName(language)}).
 - Do not add commentary or notes — only the title and article text.`,
-  });
+  }));
 
   const title = output.title;
   let paragraphs = output.paragraphs;
@@ -85,25 +102,31 @@ Rules:
 
   // Single-pass generation reliably undershoots explicit word targets — a
   // prompt asking for "at least N words" is a request, not a guarantee. If
-  // we're meaningfully short, ask the model to keep going and append,
-  // rather than silently handing back something shorter than requested.
+  // we're meaningfully short, ask the model to keep going and append. If an
+  // extend round fails even after retries, return what we already have
+  // rather than losing a perfectly good draft over it.
   for (let round = 0; round < MAX_EXTEND_ROUNDS && wordCount < targetWords * UNDERSHOOT_TOLERANCE; round++) {
     const remaining = targetWords - wordCount;
-    const { output: more } = await generateText({
-      model: MODEL,
-      maxOutputTokens: Math.min(16000, remaining * 2 + 1000),
-      output: Output.object({
-        schema: z.object({ paragraphs: z.array(z.string()) }),
-      }),
-      prompt: `You are continuing an in-progress article titled "${title}", written in ${languageName(language)} at CEFR level ${level}, about: ${topic}
+    try {
+      const { output: more } = await withRetry(() => generateText({
+        model: MODEL,
+        maxOutputTokens: Math.min(16000, remaining * 2 + 1000),
+        output: Output.object({
+          schema: z.object({ paragraphs: z.array(z.string()) }),
+        }),
+        prompt: `You are continuing an in-progress article titled "${title}", written in ${languageName(language)} at CEFR level ${level}, about: ${topic}
 
 Here is the article so far:
 ${paragraphs.join('\n\n')}
 
 Write approximately ${remaining} MORE words continuing this article — new sections, angles, examples, or sub-topics, not a summary or repetition of what's already there. Match the same CEFR ${level} vocabulary/grammar level, tone, and language. Output only the new paragraphs to append — do not repeat the existing text, and do not add commentary.`,
-    });
-    paragraphs = [...paragraphs, ...more.paragraphs];
-    wordCount = countWords(paragraphs);
+      }));
+      paragraphs = [...paragraphs, ...more.paragraphs];
+      wordCount = countWords(paragraphs);
+    } catch (err) {
+      console.error('Extend round failed after retries, returning draft as-is:', err);
+      break;
+    }
   }
 
   return { title, paragraphs, actualWords: wordCount };
