@@ -4,6 +4,12 @@
 - **Always deploy to Vercel production after committing** — `vercel --prod`, no need to ask first. This is a personal single-maintainer project; there's no staging gate.
 - The exception: if something is broken, half-finished, or the user explicitly says to hold off, don't commit/deploy — ask instead.
 
+## Workflow
+
+- **Test locally first, then deploy** — use `npm run dev` + curl/scripts to verify server-side changes (API routes, AI generation, DB queries) before committing/deploying. Don't use production as the first test environment for anything that can be tested locally.
+- **Exception: TTS/voice.** `GOOGLE_TTS_API_KEY` only works as the real Vercel-configured value, which can't be retrieved locally (see gotcha below) — anything touching actual audio generation has to be verified against production.
+- **Client-side/browser bugs (hydration, event handlers, rendering) are a blind spot regardless of local vs. prod** — there's no browser automation available, so `curl` can't see them either way. If something looks broken in the UI, ask for the browser console output rather than assuming a server-side cause.
+
 ## Known gotchas
 
 - `DATABASE_URL` points to a Neon database **shared with several other personal projects** (Estira, WaniKani, Abacus, JLPT Level Estimator). Never run `drizzle-kit push` — it diffs the whole database and will try to drop every table not in this project's `schema.ts`. Use scoped `ALTER TABLE` statements instead.
