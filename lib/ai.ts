@@ -41,6 +41,15 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 2): Promise<T> {
   throw lastErr;
 }
 
+// Non-English languages (and denser prose at higher CEFR levels) run
+// noticeably more tokens per word than English — a budget sized only off
+// English assumptions truncates the JSON mid-generation for those cases,
+// which fails schema validation and surfaces as a generic "no output"
+// error. Generous on purpose; the model stops on its own once done.
+function tokenBudget(words: number): number {
+  return Math.min(32000, words * 6 + 3000);
+}
+
 export async function simplifyText({
   paragraphs,
   language,
@@ -50,8 +59,10 @@ export async function simplifyText({
   language: string;
   level: string;
 }): Promise<string[]> {
+  const inputWords = countWords(paragraphs);
   const { output } = await withRetry(() => generateText({
     model: MODEL,
+    maxOutputTokens: tokenBudget(inputWords),
     output: Output.object({
       schema: z.object({
         paragraphs: z.array(z.string()),
@@ -94,7 +105,7 @@ export async function generateGradedText({
 
   const { output } = await withRetry(() => generateText({
     model: MODEL,
-    maxOutputTokens: Math.min(16000, targetWords * 2 + 1000),
+    maxOutputTokens: tokenBudget(targetWords),
     output: Output.object({
       schema: z.object({
         title: z.string(),
@@ -126,7 +137,7 @@ Rules:
     try {
       const { output: more } = await withRetry(() => generateText({
         model: MODEL,
-        maxOutputTokens: Math.min(16000, remaining * 2 + 1000),
+        maxOutputTokens: tokenBudget(remaining),
         output: Output.object({
           schema: z.object({ paragraphs: z.array(z.string()) }),
         }),
