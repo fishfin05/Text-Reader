@@ -102,10 +102,11 @@ export async function generateGradedText({
   length: ArticleLength;
 }): Promise<{ title: string; paragraphs: string[]; actualWords: number }> {
   const targetWords = length * WORDS_PER_MINUTE;
+  const maxWords = Math.round(targetWords * 1.15);
 
   const { output } = await withRetry(() => generateText({
     model: MODEL,
-    maxOutputTokens: tokenBudget(targetWords),
+    maxOutputTokens: tokenBudget(maxWords),
     output: Output.object({
       schema: z.object({
         title: z.string(),
@@ -115,8 +116,8 @@ export async function generateGradedText({
     prompt: `Write an original article in ${languageName(language)} at CEFR level ${level} about: ${topic}
 
 Rules:
-- REQUIRED LENGTH: at least ${targetWords} words. This is a hard minimum, not a suggestion — this article is meant to be listened to for about ${length} minutes, so stopping early defeats the point. If ${targetWords} words feels like more than the topic "needs," widen the scope: cover the topic from multiple angles, add relevant background, examples, sub-stories, or related tangents, the way a real long-form article or podcast episode would. Do not pad with repetition — add genuinely new content instead.
-- Before finalizing, mentally check your draft's length against the ${targetWords}-word minimum. If it's short, keep writing additional sections rather than concluding.
+- REQUIRED LENGTH: between ${targetWords} and ${maxWords} words — stay inside this range. This article is meant to be listened to for about ${length} minutes, so stopping well short of ${targetWords} defeats the point, but running far past ${maxWords} makes it noticeably longer than what was asked for. If ${targetWords} words feels like more than the topic "needs," widen the scope: cover the topic from multiple angles, add relevant background, examples, sub-stories, or related tangents, the way a real long-form article or podcast episode would — but stop once you're within range rather than continuing to expand. Do not pad with repetition — add genuinely new content instead.
+- Before finalizing, mentally check your draft's length against the ${targetWords}–${maxWords} word range. If it's short, keep writing additional sections; if it's already past ${maxWords}, wrap up rather than adding more.
 - Use vocabulary and grammar appropriate for CEFR ${level} — this is comprehensible input for a language learner at this level.
 - Write natural, engaging, well-organized prose in ${languageName(language)}, split into paragraphs.
 - Give it a short, fitting title (in ${languageName(language)}).

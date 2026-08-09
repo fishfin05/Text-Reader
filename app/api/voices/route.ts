@@ -3,8 +3,11 @@ import { languageLocale } from '@/lib/languages';
 
 const TTS_API_KEY = process.env.GOOGLE_TTS_API_KEY!;
 
-// Preferred voice quality tiers, best first — we keep only the best tier available.
-const QUALITY_TIERS = ['Chirp3-HD', 'Studio', 'Neural2', 'Wavenet', 'Standard'];
+// Preferred voice quality tiers, best first — we keep only the best tier
+// available. Chirp3-HD is deliberately excluded: it doesn't support SSML
+// input at all, so the <mark>-tag word-timing this app's highlighting
+// depends on silently returns zero for every word.
+const QUALITY_TIERS = ['Studio', 'Neural2', 'Wavenet', 'Standard'];
 
 const MALE_NAMES = ['James', 'David', 'Ivan', 'Marcus', 'Leo', 'Felix', 'Victor', 'Oscar', 'Noah'];
 const FEMALE_NAMES = ['Amy', 'Clara', 'Emily', 'Fiona', 'Grace', 'Hannah', 'Sofia', 'Elena', 'Mia'];
