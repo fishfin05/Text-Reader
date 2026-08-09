@@ -2,6 +2,11 @@ import { listArticles, getListeningSessions } from '@/lib/db';
 import Library from '@/components/Library';
 import type { LibraryEntry } from '@/lib/types';
 
+// This page reads live DB state (articles + listening sessions) on every
+// visit — without this it gets statically prerendered at deploy time and
+// serves that frozen snapshot until the next deploy.
+export const dynamic = 'force-dynamic';
+
 export default async function LibraryPage() {
   const [rows, sessions] = await Promise.all([listArticles(), getListeningSessions()]);
 
