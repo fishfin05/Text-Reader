@@ -4,10 +4,12 @@ import { languageLocale } from '@/lib/languages';
 const TTS_API_KEY = process.env.GOOGLE_TTS_API_KEY!;
 
 // Preferred voice quality tiers, best first — we keep only the best tier
-// available. Chirp3-HD is deliberately excluded: it doesn't support SSML
-// input at all, so the <mark>-tag word-timing this app's highlighting
-// depends on silently returns zero for every word.
-const QUALITY_TIERS = ['Studio', 'Neural2', 'Wavenet', 'Standard'];
+// available. Chirp3-HD and Studio are deliberately excluded: neither
+// supports <mark> tags in SSML (Chirp3-HD rejects SSML entirely; Studio
+// returns an explicit 400 for <mark> specifically), which is what this
+// app's word-timing highlighting depends on. Verified directly against
+// the API for both — not going on documentation alone this time.
+const QUALITY_TIERS = ['Neural2', 'Wavenet', 'Standard'];
 
 const MALE_NAMES = ['James', 'David', 'Ivan', 'Marcus', 'Leo', 'Felix', 'Victor', 'Oscar', 'Noah'];
 const FEMALE_NAMES = ['Amy', 'Clara', 'Emily', 'Fiona', 'Grace', 'Hannah', 'Sofia', 'Elena', 'Mia'];
